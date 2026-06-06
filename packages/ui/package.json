@@ -1,0 +1,11 @@
+{
+  "name": "@vendorbridge/ui",
+  "version": "1.0.0",
+  "description": "Shared UI components for VendorBridge",
+  "main": "index.ts",
+  "types": "index.ts",
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}
