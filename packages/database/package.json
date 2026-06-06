@@ -1,0 +1,19 @@
+{
+  "name": "@vendorbridge/database",
+  "version": "1.0.0",
+  "description": "Database schema and migrations for VendorBridge",
+  "scripts": {
+    "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "generate": "prisma generate",
+    "seed": "tsx seed.ts",
+    "studio": "prisma studio"
+  },
+  "devDependencies": {
+    "@prisma/cli": "^5.0.0",
+    "tsx": "^4.0.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.0.0"
+  }
+}
