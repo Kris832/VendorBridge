@@ -1,0 +1,147 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vendorbridge-postgres
+    environment:
+      POSTGRES_USER: vendorbridge
+      POSTGRES_PASSWORD: VendorBridge@123
+      POSTGRES_DB: vendorbridge
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vendorbridge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vendorbridge
+
+  minio:
+    image: minio/minio:latest
+    container_name: vendorbridge-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vendorbridge
+
+  redis:
+    image: redis:7-alpine
+    container_name: vendorbridge-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vendorbridge
+
+  backend:
+    build:
+      context: .
+      dockerfile: ./infrastructure/docker/backend.Dockerfile
+    container_name: vendorbridge-backend
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://vendorbridge:VendorBridge@123@postgres:5432/vendorbridge
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_EXPIRATION: 3600
+      REFRESH_TOKEN_SECRET: your-super-secret-refresh-token-change-in-production
+      REFRESH_TOKEN_EXPIRATION: 604800
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin123
+      MINIO_BUCKET: vendorbridge
+      MINIO_USE_SSL: 'false'
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_USER: 
+      SMTP_PASS: 
+      SMTP_FROM: noreply@vendorbridge.com
+      API_PORT: 3001
+      API_HOST: 0.0.0.0
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./apps/backend:/app
+      - /app/node_modules
+    networks:
+      - vendorbridge
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./infrastructure/docker/frontend.Dockerfile
+    container_name: vendorbridge-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_SOCKET_URL: http://localhost:3001
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./apps/frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - vendorbridge
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: vendorbridge-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - vendorbridge
+
+  nginx:
+    image: nginx:alpine
+    container_name: vendorbridge-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - vendorbridge
+
+volumes:
+  postgres_data:
+  minio_data:
+
+networks:
+  vendorbridge:
+    driver: bridge
